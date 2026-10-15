@@ -32,7 +32,27 @@ def check_risks(data: dict, criteria: dict = RISK_CRITERIA) -> dict:
     if ocf is not None and ocf < 0:
         warnings.append(f"営業CFがマイナス（{ocf:,.0f}）: 本業で現金を稼げていない")
 
-    # データ血相そのものも「判断材料不足」として知らせる
+    # 配当データの整合チェック（株式分割などで dividend_rate が古い値のまま残るケースを検出）
+    price = data.get("price")
+    dr = data.get("dividend_rate")
+    dy = data.get("dividend_yield")
+
+    # 1. 配当額から逆算した利回りと、取得した利回りが大きく食い違う → データ不整合の疑い
+    if price and dr is not None and dy and dy > 0 and price > 0:
+        implied_yield = dr / price  # dividend_rate から計算した利回り
+        if implied_yield > 0:
+            ratio = max(implied_yield, dy) / min(implied_yield, dy)
+            if ratio >= criteria["dividend_mismatch_ratio"]:
+                warnings.append(
+                    f"配当データ不整合（配当額換算{implied_yield:.1%} vs 利回り{dy:.1%}）: "
+                    f"株式分割等の影響の疑い。要手動確認"
+                )
+
+    # 2. 配当利回りが異常に高い → 記念配当・減配リスク・分割ズレの可能性
+    if dy is not None and dy > criteria["dividend_yield_high"]:
+        warnings.append(f"配当利回りが高すぎ（{dy:.1%}）: 記念配当・減配・分割ズレの可能性。要手動確認")
+
+    # データ欠損そのものも「判断材料不足」として知らせる
     missing = [k for k in ["roe", "per", "pbr", "debt_to_equity"] if data.get(k) is None]
     if missing:
         warnings.append(f"データ欠損あり（{', '.join(missing)}) : 要手動確認")

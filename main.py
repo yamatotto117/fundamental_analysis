@@ -5,7 +5,7 @@ from src.collector import load_cache
 from src.screener import screen_stock
 from src.checklist import check_risks
 from src.stock_price import within_budget, min_lot_cost, annual_dividend_per_lot, week52_position
-from src.notifier import save_report
+from src.notifier import save_report, save_report_csv
 
 TOP_N = 50  # レポートに載せる上位件数
 
@@ -28,6 +28,7 @@ def analyze_all(budget: float = BUDGET_PER_STOCK) -> list[dict]:
                 "r": check_risks(d),
                 "lot_cost": min_lot_cost(d),
                 "lot_dividend": annual_dividend_per_lot(d),
+                "week52_pos": week52_position(d),
             }
         )
 
@@ -88,5 +89,11 @@ if __name__ == "__main__":
     report = format_report(results)
     print(report)
 
-    path = save_report(report)
-    print(f"\nレポートを保存しました: {path}")
+    # テキストレポート（概観用・上位N件）
+    txt_path = save_report(report)
+    print(f"\nテキストレポートを保存しました: {txt_path}")
+
+    # CSVレポート（ソート/フィルタ用・全対象銘柄を1行ずつ）
+    csv_path = save_report_csv(results)
+    print(f"CSVレポートを保存しました: {csv_path}")
+    print("  → Excel等で開き、列ヘッダをクリックすると任意の列でソートできます")
